@@ -1,0 +1,35 @@
+@import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500;700&family=Outfit:wght@400;600;800&display=swap');
+@import "tailwindcss";
+
+@theme {
+  --font-sans: "Inter", ui-sans-serif, system-ui, sans-serif;
+  --font-mono: "JetBrains Mono", ui-monospace, SFMono-Regular, monospace;
+  --font-display: "Outfit", sans-serif;
+  
+  --color-safety-yellow: #FACC15;
+  --color-safety-orange: #F97316;
+  --color-safety-red: #EF4444;
+  --color-industrial-gray: #F1F5F9;
+  --color-industrial-dark: #F8FAFC;
+  --color-ink: #0F172A;
+}
+
+@layer base {
+  body {
+    @apply bg-industrial-dark text-ink antialiased;
+  }
+}
+
+.safety-stripes {
+  background: repeating-linear-gradient(
+    45deg,
+    #FACC15,
+    #FACC15 10px,
+    #000 10px,
+    #000 20px
+  );
+}
+
+.glass-panel {
+  @apply bg-white/80 backdrop-blur-md border border-slate-200 shadow-sm;
+}

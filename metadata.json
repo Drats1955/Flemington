@@ -1,0 +1,5 @@
+{
+  "name": "Flemington Signal Box Station HazMat Assistant",
+  "description": "A specialized chatbot for managing and querying hazardous materials information for the Flemington Car Sidings Signal Box.",
+  "requestFramePermissions": []
+}
