@@ -1,5 +1,5 @@
 import { useState, useRef, useEffect } from "react";
-import { Send, Bot, User, AlertTriangle, Info, Loader2, ChevronDown, ShieldAlert, Activity, MapPin, FileText } from "lucide-react";
+import { Send, Bot, User, AlertTriangle, Info, Loader2, ChevronDown, ShieldAlert, Activity, MapPin, FileText, RefreshCw } from "lucide-react";
 import { motion, AnimatePresence } from "motion/react";
 import Markdown from "react-markdown";
 import { chatWithAssistant } from "./services/geminiService";
@@ -7,6 +7,7 @@ import { chatWithAssistant } from "./services/geminiService";
 interface Message {
   role: "user" | "model";
   content: string;
+  style?: "technical" | "plain";
 }
 
 export default function App() {
@@ -18,6 +19,7 @@ export default function App() {
   ]);
   const [input, setInput] = useState("");
   const [isLoading, setIsLoading] = useState(false);
+  const [responseStyle, setResponseStyle] = useState<"technical" | "plain">("technical");
   const messagesEndRef = useRef<HTMLDivElement>(null);
 
   const scrollToBottom = () => {
@@ -42,13 +44,52 @@ export default function App() {
         parts: [{ text: msg.content }],
       }));
       
-      const response = await chatWithAssistant(userMessage, history);
-      setMessages((prev) => [...prev, { role: "model", content: response || "I'm sorry, I couldn't process that." }]);
+      const response = await chatWithAssistant(userMessage, history, responseStyle);
+      setMessages((prev) => [...prev, { role: "model", content: response || "I'm sorry, I couldn't process that.", style: responseStyle }]);
     } catch (error) {
       console.error("Chat error:", error);
       setMessages((prev) => [
         ...prev,
-        { role: "model", content: "An error occurred while communicating with the assistant. Please try again." },
+        { role: "model", content: "An error occurred while communicating with the assistant. Please try again.", style: responseStyle },
+      ]);
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  const handleRegenerate = async (targetStyle: "technical" | "plain") => {
+    if (isLoading || messages.length < 2) return;
+    
+    let lastUserMsgIndex = -1;
+    for (let i = messages.length - 1; i >= 0; i--) {
+      if (messages[i].role === 'user') {
+        lastUserMsgIndex = i;
+        break;
+      }
+    }
+    
+    if (lastUserMsgIndex === -1) return;
+    
+    const lastUserMsg = messages[lastUserMsgIndex];
+    const historyMessages = messages.slice(0, lastUserMsgIndex);
+    
+    setMessages(messages.slice(0, lastUserMsgIndex + 1));
+    setIsLoading(true);
+    setResponseStyle(targetStyle);
+
+    try {
+      const history = historyMessages.map((msg) => ({
+        role: msg.role,
+        parts: [{ text: msg.content }],
+      }));
+      
+      const response = await chatWithAssistant(lastUserMsg.content, history, targetStyle);
+      setMessages((prev) => [...prev, { role: "model", content: response || "I'm sorry, I couldn't process that.", style: targetStyle }]);
+    } catch (error) {
+      console.error("Chat error:", error);
+      setMessages((prev) => [
+        ...prev,
+        { role: "model", content: "An error occurred while communicating with the assistant. Please try again.", style: targetStyle },
       ]);
     } finally {
       setIsLoading(false);
@@ -61,7 +102,7 @@ export default function App() {
       <div className="h-2 safety-stripes w-full" />
 
       {/* Header */}
-      <header className="border-b border-slate-200 p-6 flex flex-col sm:flex-row justify-between items-start sm:items-center bg-white/80 backdrop-blur-xl sticky top-0 z-50">
+      <header className="border-b border-slate-200 p-6 flex flex-col lg:flex-row justify-between items-start lg:items-center bg-white/80 backdrop-blur-xl sticky top-0 z-50 gap-6">
         <div className="flex items-center gap-4">
           <div className="p-3 bg-safety-yellow rounded-lg text-black shadow-[0_4px_10px_rgba(250,204,21,0.2)]">
             <ShieldAlert size={24} strokeWidth={2.5} />
@@ -75,10 +116,39 @@ export default function App() {
           </div>
         </div>
         
-        <div className="mt-4 sm:mt-0 flex gap-6 items-center">
+        {/* Response Style Toggle */}
+        <div className="flex items-center bg-slate-100 p-1 rounded-lg border border-slate-200 self-stretch lg:self-auto">
+          <button
+            onClick={() => setResponseStyle("technical")}
+            className={`flex-1 px-4 py-2 text-xs font-bold uppercase tracking-wider rounded-md transition-all ${
+              responseStyle === "technical" 
+                ? "bg-white text-ink shadow-sm" 
+                : "text-slate-500 hover:text-ink"
+            }`}
+          >
+            Technical
+          </button>
+          <button
+            onClick={() => setResponseStyle("plain")}
+            className={`flex-1 px-4 py-2 text-xs font-bold uppercase tracking-wider rounded-md transition-all ${
+              responseStyle === "plain" 
+                ? "bg-white text-ink shadow-sm" 
+                : "text-slate-500 hover:text-ink"
+            }`}
+          >
+            Plain English
+          </button>
+        </div>
+
+        <div className="flex gap-6 items-center">
           <div className="flex flex-col items-end">
             <span className="text-[9px] uppercase tracking-widest text-slate-400 font-mono">Last Inspection</span>
             <span className="text-sm font-mono font-bold text-ink">18 FEB 2021</span>
+          </div>
+          <div className="h-10 w-[1px] bg-slate-200 hidden sm:block" />
+          <div className="flex flex-col items-end">
+            <span className="text-[9px] uppercase tracking-widest text-slate-400 font-mono">Next Inspection</span>
+            <span className="text-sm font-mono font-bold text-ink">18 FEB 2026</span>
           </div>
           <div className="h-10 w-[1px] bg-slate-200 hidden sm:block" />
           <div className="flex flex-col items-end">
@@ -128,6 +198,17 @@ export default function App() {
                       <div className={`prose prose-sm max-w-none text-sm leading-relaxed font-sans ${msg.role === 'user' ? 'prose-invert' : ''}`}>
                         <Markdown>{msg.content}</Markdown>
                       </div>
+                      {index === messages.length - 1 && msg.role === "model" && index > 0 && msg.style && (
+                        <div className="mt-4 flex justify-start border-t border-slate-100 pt-3">
+                          <button
+                            onClick={() => handleRegenerate(msg.style === "technical" ? "plain" : "technical")}
+                            className="text-xs flex items-center gap-1.5 text-slate-500 hover:text-ink transition-colors bg-slate-50 hover:bg-slate-100 px-3 py-1.5 rounded-md border border-slate-200"
+                          >
+                            <RefreshCw size={12} />
+                            View in {msg.style === "technical" ? "Plain English" : "Technical Terms"}
+                          </button>
+                        </div>
+                      )}
                     </div>
                   </div>
                 </motion.div>
@@ -200,6 +281,10 @@ export default function App() {
               Location Details
             </h3>
             <div className="space-y-4">
+              <div className="p-3 bg-white/5 rounded-lg border border-white/5">
+                <p className="text-[10px] uppercase text-slate-400 mb-1">Facility</p>
+                <p className="text-xs leading-relaxed font-medium text-slate-200">Flemington Car Sidings Signal Box</p>
+              </div>
               <div className="p-3 bg-white/5 rounded-lg border border-white/5">
                 <p className="text-[10px] uppercase text-slate-400 mb-1">Address</p>
                 <p className="text-xs leading-relaxed font-medium text-slate-200">Flemington Maintenance Centre, Bachell Avenue, Lidcombe, NSW 2141</p>

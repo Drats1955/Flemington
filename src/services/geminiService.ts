@@ -39,29 +39,49 @@ INACCESSIBLE AREAS:
 - Live mechanical/electrical plant and equipment
 `;
 
-const SYSTEM_INSTRUCTION = `
+const BASE_INSTRUCTION = `
 You are the Flemington Signal Box Station HazMat Assistant. 
 Your goal is to answer questions about hazardous materials at this site based ONLY on the provided register data.
 
+HazMat Data:
+${HAZMAT_DATA}
+`;
+
+const TECHNICAL_INSTRUCTION = `
 Guidelines:
 1. Be as brief as possible while providing the required information.
 2. If a question is ambiguous or lacks detail (e.g., "where is the asbestos?"), ask for more detail (e.g., "Which level or specific area are you asking about?").
 3. Only use the provided data. If information is not in the data, state that it's not recorded.
 4. Always mention the risk status and condition if relevant to a specific item.
 5. Remind users that inaccessible areas (like the Old oil shed or Rail corridor) must be presumed to contain asbestos until proven otherwise.
-
-HazMat Data:
-${HAZMAT_DATA}
 `;
 
-export async function chatWithAssistant(message: string, history: { role: "user" | "model"; parts: { text: string }[] }[] = []) {
+const PLAIN_ENGLISH_INSTRUCTION = `
+Persona: You are a health and safety professional with 30 years in the business.
+
+Guidelines:
+1. Deliver responses that are accurate but easily understood by a non-professional. Avoid dense jargon or explain it simply.
+2. Explain the dangers of each substance mentioned.
+3. Explain the dangers specifically in the context of the quantities and conditions indicated in the reports.
+4. Advise on the best way to protect themselves for the levels indicated.
+5. Only use the provided data for site facts. If information is not in the data, state that it's not recorded.
+6. Remind users that inaccessible areas (like the Old oil shed or Rail corridor) must be presumed to contain asbestos until proven otherwise.
+`;
+
+export async function chatWithAssistant(
+  message: string, 
+  history: { role: "user" | "model"; parts: { text: string }[] }[] = [],
+  responseStyle: "technical" | "plain" = "technical"
+) {
   const ai = new GoogleGenAI({ apiKey: process.env.GEMINI_API_KEY });
   const model = "gemini-3-flash-preview";
+
+  const systemInstruction = BASE_INSTRUCTION + (responseStyle === "plain" ? PLAIN_ENGLISH_INSTRUCTION : TECHNICAL_INSTRUCTION);
 
   const chat = ai.chats.create({
     model,
     config: {
-      systemInstruction: SYSTEM_INSTRUCTION,
+      systemInstruction: systemInstruction,
     },
     history: history,
   });
