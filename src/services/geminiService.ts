@@ -89,3 +89,21 @@ export async function chatWithAssistant(
   const response = await chat.sendMessage({ message });
   return response.text;
 }
+
+export async function generatePrintSummary() {
+  const ai = new GoogleGenAI({ apiKey: process.env.GEMINI_API_KEY });
+  const model = "gemini-3-flash-preview";
+  
+  const prompt = `Based on the following HazMat data for Flemington Signal Box Station, generate a concise, professional 1-page summary of the hazards. 
+Format it for an A4 printed report. Use clear headings (e.g., Facility Overview, Key Hazards, Required Precautions), bullet points, and bold text for emphasis.
+Keep it under 400 words to ensure it fits on a single page.
+
+HazMat Data:
+${HAZMAT_DATA}`;
+
+  const response = await ai.models.generateContent({
+    model,
+    contents: prompt,
+  });
+  return response.text;
+}

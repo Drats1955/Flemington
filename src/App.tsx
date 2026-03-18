@@ -1,8 +1,8 @@
 import { useState, useRef, useEffect } from "react";
-import { Send, Bot, User, AlertTriangle, Info, Loader2, ChevronDown, ShieldAlert, Activity, MapPin, FileText, RefreshCw } from "lucide-react";
+import { Send, Bot, User, AlertTriangle, Info, Loader2, ChevronDown, ShieldAlert, Activity, MapPin, FileText, RefreshCw, Printer } from "lucide-react";
 import { motion, AnimatePresence } from "motion/react";
 import Markdown from "react-markdown";
-import { chatWithAssistant } from "./services/geminiService";
+import { chatWithAssistant, generatePrintSummary } from "./services/geminiService";
 
 interface Message {
   role: "user" | "model";
@@ -20,6 +20,8 @@ export default function App() {
   const [input, setInput] = useState("");
   const [isLoading, setIsLoading] = useState(false);
   const [responseStyle, setResponseStyle] = useState<"technical" | "plain">("technical");
+  const [printSummary, setPrintSummary] = useState<string | null>(null);
+  const [isGeneratingPrint, setIsGeneratingPrint] = useState(false);
   const messagesEndRef = useRef<HTMLDivElement>(null);
 
   const scrollToBottom = () => {
@@ -96,9 +98,47 @@ export default function App() {
     }
   };
 
+  const handlePrintSummary = async () => {
+    setIsGeneratingPrint(true);
+    try {
+      const summary = await generatePrintSummary();
+      setPrintSummary(summary);
+      // Wait for React to render the print view
+      setTimeout(() => {
+        window.print();
+        setIsGeneratingPrint(false);
+      }, 500);
+    } catch (error) {
+      console.error("Failed to generate summary", error);
+      setIsGeneratingPrint(false);
+    }
+  };
+
   return (
-    <div className="min-h-screen bg-industrial-dark text-ink font-sans flex flex-col selection:bg-safety-yellow selection:text-black">
-      {/* Top Safety Stripe */}
+    <>
+      {/* Print View */}
+      <div className="hidden print:block print:bg-white print:text-black font-sans">
+        <div className="border-b-2 border-black pb-4 mb-6 flex justify-between items-end">
+          <div>
+            <h1 className="text-2xl font-bold uppercase tracking-widest">Hazard Summary Report</h1>
+            <h2 className="text-lg text-slate-600">Flemington Signal Box Station</h2>
+          </div>
+          <div className="text-right text-sm font-mono text-slate-500">
+            <p>Generated: {new Date().toLocaleDateString()}</p>
+            <p>Asset: 445</p>
+          </div>
+        </div>
+        <div className="prose prose-sm max-w-none text-black">
+          <Markdown>{printSummary || "Generating summary..."}</Markdown>
+        </div>
+        <div className="mt-12 pt-4 border-t border-slate-300 text-center text-xs text-slate-500 font-mono">
+          CONFIDENTIAL - PROPERTY RISK AUSTRALIA - FOR AUTHORIZED PERSONNEL ONLY
+        </div>
+      </div>
+
+      {/* Main App View */}
+      <div className="min-h-screen bg-industrial-dark text-ink font-sans flex flex-col selection:bg-safety-yellow selection:text-black print:hidden">
+        {/* Top Safety Stripe */}
       <div className="h-2 safety-stripes w-full" />
 
       {/* Header */}
@@ -237,7 +277,7 @@ export default function App() {
           <div className="p-6 bg-slate-50 border-t border-slate-200">
             <div className="relative group">
               <div className="absolute -inset-0.5 bg-gradient-to-r from-safety-yellow/20 to-safety-orange/20 rounded-xl blur opacity-10 group-focus-within:opacity-40 transition duration-500"></div>
-              <div className="relative flex items-center bg-white rounded-xl border border-slate-200 overflow-hidden shadow-sm">
+              <div className="relative flex items-center bg-white rounded-xl border-2 border-slate-400 focus-within:border-slate-600 overflow-hidden shadow-sm transition-colors">
                 <input
                   type="text"
                   value={input}
@@ -316,6 +356,20 @@ export default function App() {
               ))}
             </ul>
           </div>
+
+          {/* Print Action */}
+          <div className="mt-auto pt-4">
+            <button
+              onClick={handlePrintSummary}
+              disabled={isGeneratingPrint}
+              className="w-full flex items-center justify-center gap-2 p-3 bg-slate-800 hover:bg-slate-700 text-white rounded-xl border border-slate-700 transition-colors shadow-sm disabled:opacity-50"
+            >
+              {isGeneratingPrint ? <Loader2 size={16} className="animate-spin" /> : <Printer size={16} />}
+              <span className="text-xs font-bold uppercase tracking-wider">
+                {isGeneratingPrint ? "Generating..." : "Send Summary to Printer"}
+              </span>
+            </button>
+          </div>
         </aside>
       </main>
 
@@ -330,5 +384,6 @@ export default function App() {
         </div>
       </footer>
     </div>
+    </>
   );
 }
